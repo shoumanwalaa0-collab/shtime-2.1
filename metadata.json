@@ -1,0 +1,6 @@
+{
+  "name": "اللعب Shtime 2",
+  "description": "لعبة ألغاز SHtime 2 الممتعة والمثيرة مع المراحل المتنوعة والمستويات والترقيات والجوائز.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
