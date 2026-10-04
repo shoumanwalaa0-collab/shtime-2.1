@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { STAGE_CATEGORIES } from '../data/riddles';
-import { X, Award, Lock, Unlock, Gift, AlertCircle, Coins } from 'lucide-react';
+import { soundFx } from '../utils/soundEffects';
+import { triggerStageWinConfetti } from '../utils/confetti';
+import { X, Award, Lock, Unlock, Gift, AlertCircle, Coins, WifiOff } from 'lucide-react';
 
 interface LevelRewardsModalProps {
   isOpen: boolean;
@@ -28,9 +30,14 @@ export const LevelRewardsModal: React.FC<LevelRewardsModalProps> = ({
   const handleRewardClick = (catIndex: number, isUnlocked: boolean) => {
     setErrorMessage(null);
     if (isUnlocked) {
-      onClaimReward(catIndex);
+      if (!claimedLevelRewards.includes(catIndex)) {
+        soundFx.playCoinSound();
+        triggerStageWinConfetti();
+        onClaimReward(catIndex);
+      }
     } else {
       // Deduct 1 lira and display required error toast
+      soundFx.playWrongSound();
       onDeductForLockedClick();
       setErrorMessage('هذا غير مفتوح لحد الان (-1 ليرة)');
       setTimeout(() => {

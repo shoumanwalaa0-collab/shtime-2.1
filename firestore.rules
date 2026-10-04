@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection document
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Upgrades and Promo Codes collection disabled (no free money or promo redemptions allowed)
+    match /upgrades_codes/{codeId} {
+      allow read, write: if false;
+    }
+  }
+}

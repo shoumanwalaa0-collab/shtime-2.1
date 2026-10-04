@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "UpgradeCode": {
+      "title": "Upgrade Code",
+      "description": "Secure promo or upgrade redemption code for in-game features and rewards",
+      "type": "object",
+      "properties": {
+        "code_string": {
+          "type": "string",
+          "description": "The exact promo code string entered by the user",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "is_used": {
+          "type": "boolean",
+          "description": "Whether the code has already been redeemed"
+        },
+        "used_by": {
+          "type": "string",
+          "description": "Username or player ID who redeemed the code",
+          "maxLength": 128
+        },
+        "used_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of when the code was used"
+        },
+        "upgrade_type": {
+          "type": "string",
+          "description": "The feature or reward unlocked by this code",
+          "maxLength": 64
+        },
+        "reward_value": {
+          "type": "number",
+          "description": "Numerical reward amount such as liras, jewels, or seconds"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when code was generated"
+        }
+      },
+      "required": ["code_string", "is_used", "upgrade_type"]
+    }
+  },
+  "firestore": {
+    "/upgrades_codes/{codeId}": {
+      "schema": "UpgradeCode",
+      "description": "Collection of promo and upgrade codes"
+    }
+  }
+}

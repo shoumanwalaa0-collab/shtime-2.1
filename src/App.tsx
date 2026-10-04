@@ -2,71 +2,101 @@ import React, { useState, useEffect } from 'react';
 import { UserGameState } from './types';
 import { IntroScreen } from './components/IntroScreen';
 import { MainScreen } from './components/MainScreen';
-import { getPermanentUsedCodes } from './utils/codeStorage';
-
-const STORAGE_KEY = 'shtime2_game_state_v1';
-
-const getInitialGameState = (): UserGameState => ({
-  liras: 0, // Starts at 0 Lira as requested
-  currentStage: 1,
-  completedStages: 0,
-  claimedLevelRewards: [],
-  bonusTimeSeconds: 0,
-  usedCodes: getPermanentUsedCodes(),
-});
+import { AdminLoginModal } from './components/AdminLoginModal';
+import { OfflineNotificationModal } from './components/OfflineNotificationModal';
+import { YouTubeMusicPlayer } from './components/YouTubeMusicPlayer';
+import { loadPersistedGameState, savePersistedGameState, clearPersistedGameState, getInitialGameState } from './utils/storage';
 
 export default function App() {
-  const [screen, setScreen] = useState<'intro' | 'main'>('intro');
-  const [gameState, setGameState] = useState<UserGameState>(() => {
-    const permanentCodes = getPermanentUsedCodes();
+  const [gameState, setGameState] = useState<UserGameState>(() => loadPersistedGameState());
+  const [initialDeepLinkGameId] = useState<string | null>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: UserGameState = JSON.parse(saved);
-        // Merge usedCodes with permanent blacklist so redeemed codes are never lost
-        const mergedUsedCodes = Array.from(new Set([...(parsed.usedCodes || []), ...permanentCodes]));
-        return {
-          ...parsed,
-          usedCodes: mergedUsedCodes,
-        };
+      const urlParams = new URLSearchParams(window.location.search);
+      const param = urlParams.get('gameId');
+      if (param) return param;
+      if (window.location.hash.startsWith('#game=')) {
+        return window.location.hash.replace('#game=', '');
       }
-    } catch (e) {
-      console.error('Error loading saved state:', e);
+    } catch {
+      // ignore
     }
-    return getInitialGameState();
+    return null;
   });
+  const [screen, setScreen] = useState<'intro' | 'main'>(() => (initialDeepLinkGameId ? 'main' : 'intro'));
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
 
-  // Save game state to localStorage on state changes
+  // Automatically persist game state synchronously whenever it changes
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-    } catch (e) {
-      console.error('Error saving state:', e);
-    }
+    savePersistedGameState(gameState);
   }, [gameState]);
 
-  // Logout handler: Resets progress (liras, stage) BUT keeps permanent used codes blacklisted forever
-  const handleLogout = () => {
+  // Logout handler:
+  // "اذا الشخص صنع لعبه وبعد قليل سجل خروجه من اللعبه يتم حذف اللعبه الذي صنعها معها كليا
+  // والشيء الوحيد الذي لا يتم حذفه ابدا هو الباسورد الذي استخدمته والاسم"
+  const handleLogout = async () => {
+    const gamesToDelete = gameState.customGames || [];
+    const gameIds = gamesToDelete.map((g) => g.id).filter(Boolean);
+    const creatorNames = Array.from(
+      new Set(gamesToDelete.map((g) => g.creatorName).filter(Boolean) as string[])
+    );
+
+    // Wipe games from local storage
     try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-      console.error('Error removing state on logout:', e);
+      localStorage.removeItem('shtime2_user_custom_games');
+    } catch {
+      // ignore
     }
+
+    // Call server to delete games created by this user
+    try {
+      await fetch('/api/custom-games/delete-user-games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameIds, creatorNames }),
+      });
+    } catch {
+      // fallback
+    }
+
+    // Clear persisted game state while keeping permanent used codes & names intact
+    clearPersistedGameState();
     setGameState(getInitialGameState());
     setScreen('intro');
+    setActiveModal(null);
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#070b19] text-white selection:bg-amber-500 selection:text-slate-950">
+    <div className="w-full min-h-screen bg-[#020617] text-white selection:bg-amber-500 selection:text-slate-950 relative">
       {screen === 'intro' ? (
-        <IntroScreen onStart={() => setScreen('main')} />
+        <IntroScreen
+          onStart={() => setScreen('main')}
+          gameState={gameState}
+          onOpenAdmin={() => setShowAdminModal(true)}
+        />
       ) : (
         <MainScreen
           gameState={gameState}
           setGameState={setGameState}
           onLogout={handleLogout}
+          onActiveModalChange={setActiveModal}
+          initialDeepLinkGameId={initialDeepLinkGameId}
         />
       )}
+
+      {/* Admin Login Modal (can open from IntroScreen or MainScreen) */}
+      <AdminLoginModal
+        isOpen={showAdminModal}
+        onClose={() => setShowAdminModal(false)}
+        gameState={gameState}
+        setGameState={setGameState}
+      />
+
+      {/* Offline and Game Update Notification Modals */}
+      <OfflineNotificationModal />
+
+      {/* Continuous Background Music from YouTube: cannot be stopped manually, only on exiting game */}
+      <YouTubeMusicPlayer />
     </div>
   );
 }
